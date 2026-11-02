@@ -16,10 +16,14 @@ def get_config():
     try:
         import streamlit as st
         service_account = st.secrets.get("GOOGLE_SERVICE_ACCOUNT")
+        oauth_client = st.secrets.get("GOOGLE_OAUTH_CLIENT_JSON")
+        oauth_token = st.secrets.get("GOOGLE_OAUTH_TOKEN_JSON")
         folder_id = st.secrets.get("GOOGLE_DRIVE_FOLDER_ID", "")
         sheet_id = st.secrets.get("GOOGLE_SHEET_ID", "")
     except Exception:
         service_account = None
+        oauth_client = None
+        oauth_token = None
         folder_id = ""
         sheet_id = ""
     if isinstance(service_account, dict):
@@ -29,15 +33,48 @@ def get_config():
             service_account = json.loads(service_account)
         except json.JSONDecodeError:
             service_account = None
-    if not service_account:
-        return None
-    return {"service_account": service_account, "folder_id": str(folder_id).strip(),
-            "sheet_id": str(sheet_id).strip()}
+    if service_account:
+        return {"mode": "service_account", "service_account": service_account,
+                "folder_id": str(folder_id).strip(), "sheet_id": str(sheet_id).strip()}
+
+    if isinstance(oauth_client, str):
+        try:
+            oauth_client = json.loads(oauth_client)
+        except json.JSONDecodeError:
+            oauth_client = None
+    if isinstance(oauth_token, str):
+        try:
+            oauth_token = json.loads(oauth_token)
+        except json.JSONDecodeError:
+            oauth_token = None
+    if oauth_client and oauth_token:
+        if "installed" in oauth_client:
+            oauth_client = oauth_client["installed"]
+        oauth_credentials = dict(oauth_client)
+        oauth_credentials.update(oauth_token)
+        return {"mode": "oauth", "oauth_credentials": oauth_credentials,
+                "folder_id": str(folder_id).strip(), "sheet_id": str(sheet_id).strip()}
+
+    local_credentials = APP_DIR / "credentials.json"
+    local_token = APP_DIR / "token.json"
+    if local_credentials.is_file() and local_token.is_file():
+        client = json.loads(local_credentials.read_text())
+        if "installed" in client:
+            client = client["installed"]
+        token = json.loads(local_token.read_text())
+        oauth_credentials = dict(client)
+        oauth_credentials.update(token)
+        return {"mode": "oauth", "oauth_credentials": oauth_credentials,
+                "folder_id": str(folder_id).strip(), "sheet_id": str(sheet_id).strip()}
+    return None
 
 
 def _credentials(config, scopes):
-    from google.oauth2.service_account import Credentials
-    return Credentials.from_service_account_info(config["service_account"], scopes=scopes)
+    if config["mode"] == "service_account":
+        from google.oauth2.service_account import Credentials
+        return Credentials.from_service_account_info(config["service_account"], scopes=scopes)
+    from google.oauth2.credentials import Credentials
+    return Credentials.from_authorized_user_info(config["oauth_credentials"], scopes=scopes)
 
 
 def status():

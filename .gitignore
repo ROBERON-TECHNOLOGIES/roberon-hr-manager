@@ -3,6 +3,9 @@ __pycache__/
 roberon_hr.db
 credentials.json
 token.json
+token*.json
+credentials*.json
+service-account*.json
 payslips/*.pdf
 .launcher.log
 .streamlit/secrets.toml

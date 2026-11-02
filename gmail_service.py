@@ -1,13 +1,18 @@
 """Optional Gmail API delivery. The browser draft flow does not depend on this."""
 import base64
 import os
+import json
 from email.message import EmailMessage
 from pathlib import Path
 
 from gmail_compose import email_content
 
 APP_DIR = Path(__file__).resolve().parent
-SCOPES = ['https://www.googleapis.com/auth/gmail.send']
+SCOPES = [
+    'https://www.googleapis.com/auth/gmail.send',
+    'https://www.googleapis.com/auth/drive.file',
+    'https://www.googleapis.com/auth/spreadsheets',
+]
 
 
 class GmailSetupError(Exception):
@@ -40,6 +45,15 @@ def connect_gmail():
     try:
         if token_file.exists():
             creds = Credentials.from_authorized_user_file(str(token_file), SCOPES)
+            granted_scopes = set(getattr(creds, 'scopes', None) or [])
+            try:
+                token_data = json.loads(token_file.read_text())
+                granted_scopes.update(token_data.get('scopes', []))
+            except (json.JSONDecodeError, OSError):
+                granted_scopes = set()
+            missing_scopes = set(SCOPES) - granted_scopes
+            if missing_scopes:
+                creds = None
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
