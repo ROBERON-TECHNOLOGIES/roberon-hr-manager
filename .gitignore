@@ -1,0 +1,8 @@
+__pycache__/
+.venv/
+roberon_hr.db
+credentials.json
+token.json
+payslips/*.pdf
+.launcher.log
+.streamlit/secrets.toml
